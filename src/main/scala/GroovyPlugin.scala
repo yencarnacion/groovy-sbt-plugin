@@ -10,7 +10,8 @@ object GroovyPlugin extends Plugin {
     val settings = Seq(
       groovyVersion := "2.4.6",
       libraryDependencies ++= Seq[ModuleID](
-        "org.codehaus.groovy" % "groovy-all" % groovyVersion.value % Config.name
+        "org.codehaus.groovy" % "groovy-all" % groovyVersion.value % Config.name,
+        "org.apache.ant" % "ant" % "1.9.6" % Config.name
       )
     )
   }
@@ -18,7 +19,7 @@ object GroovyPlugin extends Plugin {
   object groovy extends Keys {
     val settings = Seq(ivyConfigurations += Config) ++ GroovyDefaults.settings ++ Seq(
       groovySource in Compile := (sourceDirectory in Compile).value / "groovy",
-      unmanagedResourceDirectories in Compile += {(groovySource in Compile).value},
+      unmanagedSourceDirectories in Compile += {(groovySource in Compile).value},
       groovyc in Compile := {
         val s: TaskStreams = streams.value
         val sourceDirectory : File = (groovySource in Compile).value
@@ -51,7 +52,7 @@ object GroovyPlugin extends Plugin {
       fullClasspath <<= fullClasspath in Test,
 
       groovySource in Test := (sourceDirectory in Test).value / "groovy",
-      unmanagedResourceDirectories in Test += {(groovySource in Test).value},
+      unmanagedSourceDirectories in Test += {(groovySource in Test).value},
       groovyc in Test := {
         val sourceDirectory : File = (groovySource in Test).value
         val nb = (sourceDirectory ** "*.clj").get.size

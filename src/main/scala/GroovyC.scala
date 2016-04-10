@@ -4,34 +4,49 @@ import sbt._
 import sbt.Keys._
 import java.io.File
 
-import org.apache.tools.ant.Project
-import org.apache.tools.ant.taskdefs.Javac
-import org.codehaus.groovy.ant.Groovyc
-import org.apache.tools.ant.types.Path
+import sbt.classpath.ClasspathUtilities
+
 
 class GroovyC(val classpath : Seq[File], val sourceDirectory : File, val stubDirectory : File, val destinationDirectory : File) {
+
+  lazy val classLoader = ClasspathUtilities.toLoader(classpath)
+
+  lazy val projectClass = classLoader.loadClass("org.apache.tools.ant.Project")
+  lazy val generateStubsClass = classLoader.loadClass("org.codehaus.groovy.ant.GenerateStubsTask")
+  lazy val groovycClass = classLoader.loadClass("org.codehaus.groovy.ant.Groovyc")
+  lazy val javacClass = classLoader.loadClass("org.apache.tools.ant.taskdefs.Javac")
+  lazy val pathClass = classLoader.loadClass("org.apache.tools.ant.types.Path")
+
+  lazy val pathConstructor = pathClass.getConstructor(projectClass)
+  lazy val setLocationMethod = pathClass.getMethod("setLocation", classOf[java.io.File])
+
+  lazy val setGroovycSrcdirMethod = groovycClass.getMethod("setSrcdir", pathClass)
+  lazy val setGroovycStubdirMethod = groovycClass.getMethod("setStubdir", classOf[java.io.File])
+  lazy val setGroovycDestdirMethod = groovycClass.getMethod("setDestdir", classOf[java.io.File])
+  lazy val setGroovycProjectMethod = groovycClass.getMethod("setProject", projectClass)
+  lazy val addGroovycConfiguredJavacMethod = groovycClass.getMethod("addConfiguredJavac", javacClass)
+  lazy val setGroovycKeepStubsMethod = groovycClass.getMethod("setKeepStubs", java.lang.Boolean.TYPE)
+  lazy val setGroovycVerboseMethod = groovycClass.getMethod("setVerbose", java.lang.Boolean.TYPE)
+  lazy val executeGroovycMethod = groovycClass.getMethod("execute")
 
   def compile() : Unit =  {
     IO.createDirectory(sourceDirectory)
     IO.createDirectory(destinationDirectory)
     try{
       //Thread.currentThread.setContextClassLoader(classLoader)
-      val project = new Project()
-      val javac = new Javac()
-      val groovyc = new Groovyc()
-
-      val sourcePath = new Path(project)
-      sourcePath.setLocation(sourceDirectory)
-
-      groovyc.setClasspath(new Path(project, classpath.mkString(";")))
-      groovyc.setSrcdir(sourcePath)
-      groovyc.setStubdir(stubDirectory)
-      groovyc.setDestdir(destinationDirectory)
-      groovyc.setProject(project)
-      groovyc.addConfiguredJavac(javac)
-      groovyc.setKeepStubs(true)
-      groovyc.setVerbose(true)
-      groovyc.execute()
+      val project = projectClass.newInstance()
+      val javac = javacClass.newInstance()
+      val groovyc = groovycClass.newInstance()
+      val path = pathConstructor.newInstance(project.asInstanceOf[AnyRef])
+      setLocationMethod.invoke(path, sourceDirectory)
+      setGroovycSrcdirMethod.invoke(groovyc, path.asInstanceOf[AnyRef])
+      setGroovycStubdirMethod.invoke(groovyc, stubDirectory)
+      setGroovycDestdirMethod.invoke(groovyc, destinationDirectory)
+      setGroovycProjectMethod.invoke(groovyc, project.asInstanceOf[AnyRef])
+      addGroovycConfiguredJavacMethod.invoke(groovyc, javac.asInstanceOf[AnyRef])
+      setGroovycKeepStubsMethod.invoke(groovyc, true.asInstanceOf[AnyRef])
+      setGroovycVerboseMethod.invoke(groovyc, true.asInstanceOf[AnyRef])
+      executeGroovycMethod.invoke(groovyc)
     }
     finally{
       //Thread.currentThread.setContextClassLoader(oldContextClassLoader)
